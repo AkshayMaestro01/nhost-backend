@@ -5,15 +5,10 @@ export default async function handler(req, res) {
     const adminSecret = process.env.NHOST_ADMIN_SECRET;
 
     if (!graphqlUrl || !authUrl || !adminSecret) {
-      return res.status(500).json({
-        error: "Missing environment variables"
-      });
+      return res.status(500).json({ error: "Missing environment variables" });
     }
 
-    // Ensure correct base (remove trailing /v1 if present)
-    const baseAuthUrl = authUrl.replace(/\/v1$/, "");
-
-    // 1️⃣ Fetch employees
+    // Fetch users
     const usersResponse = await fetch(graphqlUrl, {
       method: "POST",
       headers: {
@@ -51,42 +46,32 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // 2️⃣ Create Auth user via Admin API
-      const createUserResponse = await fetch(
-        `${baseAuthUrl}/v1/admin/users`,
+      // Create user using signup
+      const signupResponse = await fetch(
+        `${authUrl}/signup`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${adminSecret}`
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: user.email,
-            password: "Temp@1234", // Temporary password
-            emailVerified: true,
-            displayName: user.full_name,
-            defaultRole: "user"
+            password: "Temp@1234",
+            options: {
+              displayName: user.full_name
+            }
           })
         }
       );
 
-      const responseText = await createUserResponse.text();
+      const signupResult = await signupResponse.json();
 
-      let createdUser;
-
-      try {
-        createdUser = JSON.parse(responseText);
-      } catch (e) {
+      if (!signupResponse.ok || !signupResult.user?.id) {
         skipped++;
         continue;
       }
 
-      if (!createUserResponse.ok || !createdUser.id) {
-        skipped++;
-        continue;
-      }
+      const userId = signupResult.user.id;
 
-      // 3️⃣ Link user_id in master_employee
+      // Link user_id
       await fetch(graphqlUrl, {
         method: "POST",
         headers: {
@@ -104,25 +89,16 @@ export default async function handler(req, res) {
               }
             }
           `,
-          variables: {
-            id: user.id,
-            user_id: createdUser.id
-          }
+          variables: { id: user.id, user_id: userId }
         })
       });
 
       migrated++;
     }
 
-    return res.json({
-      success: true,
-      migrated,
-      skipped
-    });
+    return res.json({ success: true, migrated, skipped });
 
   } catch (error) {
-    return res.status(500).json({
-      error: error.message
-    });
+    return res.status(500).json({ error: error.message });
   }
 }
