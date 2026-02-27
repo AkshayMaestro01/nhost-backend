@@ -1,22 +1,18 @@
 export default async function handler(req, res) {
   try {
+    const graphqlUrl = process.env.NHOST_GRAPHQL_URL;
+    const authUrl = process.env.NHOST_AUTH_URL;
     const adminSecret = process.env.NHOST_ADMIN_SECRET;
-    const graphqlUrl = process.env.NHOST_GRAPHQL_URL ||
-  "http://graphql-engine:8080/v1/graphql";
 
-    if (!adminSecret || !graphqlUrl) {
+    if (!graphqlUrl || !authUrl || !adminSecret) {
       return res.status(500).json({
-        error: "Missing environment variables"
+        error: "Missing required environment variables",
+        graphqlUrl,
+        authUrl
       });
     }
 
-    // Extract project subdomain safely
-    const url = new URL(graphqlUrl);
-    const subdomain = url.hostname.split(".")[0];
-
-    const backendUrl = `https://${subdomain}.nhost.run`;
-
-    // Fetch employees
+    // 1️⃣ Fetch users from master_employee
     const usersResponse = await fetch(graphqlUrl, {
       method: "POST",
       headers: {
@@ -48,6 +44,7 @@ export default async function handler(req, res) {
     let migrated = 0;
     let skipped = 0;
 
+    // 2️⃣ Create Auth users
     for (const user of users) {
 
       if (!user.email || !user.password) {
@@ -56,7 +53,7 @@ export default async function handler(req, res) {
       }
 
       const createUserResponse = await fetch(
-        `${backendUrl}/v1/auth/admin/users`,
+        `${authUrl}/admin/users`,
         {
           method: "POST",
           headers: {
@@ -80,7 +77,7 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // Link user_id
+      // 3️⃣ Link user_id to master_employee
       await fetch(graphqlUrl, {
         method: "POST",
         headers: {
