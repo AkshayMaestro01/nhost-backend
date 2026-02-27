@@ -13,7 +13,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 1️⃣ Fetch employees from master_employee
+    // Step 1: Fetch master_employee
     const usersResponse = await fetch(graphqlUrl, {
       method: "POST",
       headers: {
@@ -27,14 +27,23 @@ export default async function handler(req, res) {
               id
               email
               full_name
-              user_id
             }
           }
         `
       })
     });
 
-    const usersResult = await usersResponse.json();
+    const usersText = await usersResponse.text();
+
+    let usersResult;
+    try {
+      usersResult = JSON.parse(usersText);
+    } catch (e) {
+      return res.status(500).json({
+        error: "GraphQL did not return JSON",
+        raw: usersText
+      });
+    }
 
     if (usersResult.errors) {
       return res.status(500).json(usersResult.errors);
@@ -48,100 +57,86 @@ export default async function handler(req, res) {
 
     for (const user of users) {
 
-      // Skip already linked
-      if (user.user_id) {
-        skipped++;
-        continue;
-      }
-
       if (!user.email) {
         skipped++;
         continue;
       }
 
-      try {
-        // 2️⃣ Create user via Admin API (CORRECT WAY)
-        const createUserResponse = await fetch(
-          `${authUrl}/admin/users`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${adminSecret}`
-            },
-            body: JSON.stringify({
-              email: user.email,
-              password: "Temp@1234",
-              emailVerified: true,
-              displayName: user.full_name,
-              defaultRole: "user"
-            })
-          }
-        );
-
-        const responseText = await createUserResponse.text();
-
-        let createUserResult;
-        try {
-          createUserResult = JSON.parse(responseText);
-        } catch {
-          errors.push({ email: user.email, raw: responseText });
-          skipped++;
-          continue;
-        }
-
-        if (!createUserResponse.ok || !createUserResult.id) {
-          errors.push({ email: user.email, response: createUserResult });
-          skipped++;
-          continue;
-        }
-
-        const userId = createUserResult.id;
-
-        // 3️⃣ Link user_id back to master_employee
-        await fetch(graphqlUrl, {
+      const signupResponse = await fetch(
+        `${authUrl}/signup/email-password`,
+        {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-hasura-admin-secret": adminSecret
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            query: `
-              mutation ($id: Int!, $user_id: uuid!) {
-                update_master_employee_by_pk(
-                  pk_columns: { id: $id },
-                  _set: { user_id: $user_id }
-                ) {
-                  id
-                }
-              }
-            `,
-            variables: {
-              id: user.id,
-              user_id: userId
+            email: user.email,
+            password: "Temp@1234",
+            options: {
+              displayName: user.full_name
             }
           })
-        });
+        }
+      );
 
-        migrated++;
+      const signupText = await signupResponse.json();
 
-      } catch (loopError) {
+      let signupResult;
+      try {
+        console.log("Signup response:", signupText);
+        signupResult = JSON.parse(signupText);
+      } catch (e) {
         errors.push({
           email: user.email,
-          message: loopError.message
+          raw: signupText
         });
         skipped++;
         continue;
       }
+
+      if (!signupResponse.ok || !signupResult.user?.id) {
+        errors.push({
+          email: user.email,
+          response: signupResult
+        });
+        skipped++;
+        continue;
+      }
+
+      const userId = signupResult.user.id;
+
+      // Link user_id
+      await fetch(graphqlUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-hasura-admin-secret": adminSecret
+        },
+        body: JSON.stringify({
+          query: `
+            mutation ($id: Int!, $user_id: uuid!) {
+              update_master_employee_by_pk(
+                pk_columns: { id: $id },
+                _set: { user_id: $user_id }
+              ) {
+                id
+              }
+            }
+          `,
+          variables: {
+            id: user.id,
+            user_id: userId
+          }
+        })
+      });
+
+      migrated++;
     }
 
     return res.json({
       success: true,
-      totalUsers: users.length,
       migrated,
       skipped,
       errorCount: errors.length,
-      sampleErrors: errors.slice(0, 5)
+      sampleErrors: errors.slice(0, 3)
     });
 
   } catch (err) {
