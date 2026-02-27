@@ -1,13 +1,17 @@
 export default async function handler(req, res) {
   try {
     const graphqlUrl = process.env.NHOST_GRAPHQL_URL;
+    const authUrl = process.env.NHOST_AUTH_URL;
     const adminSecret = process.env.NHOST_ADMIN_SECRET;
 
-    if (!graphqlUrl || !adminSecret) {
+    if (!graphqlUrl || !authUrl || !adminSecret) {
       return res.status(500).json({
         error: "Missing environment variables"
       });
     }
+
+    // Ensure correct base (remove trailing /v1 if present)
+    const baseAuthUrl = authUrl.replace(/\/v1$/, "");
 
     // 1️⃣ Fetch employees
     const usersResponse = await fetch(graphqlUrl, {
@@ -22,7 +26,6 @@ export default async function handler(req, res) {
             master_employee {
               id
               email
-              password
               full_name
             }
           }
@@ -43,54 +46,47 @@ export default async function handler(req, res) {
 
     for (const user of users) {
 
-      if (!user.email || !user.password) {
+      if (!user.email) {
         skipped++;
         continue;
       }
 
-      // 2️⃣ Insert into auth.users via GraphQL
-      const createUserResponse = await fetch(graphqlUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-hasura-admin-secret": adminSecret
-        },
-        body: JSON.stringify({
-          query: `
-            mutation CreateUser(
-              $email: String!
-              $passwordHash: String!
-              $displayName: String
-            ) {
-              insert_auth_users_one(object: {
-                email: $email
-                passwordHash: $passwordHash
-                displayName: $displayName
-                defaultRole: "user"
-                emailVerified: true
-              }) {
-                id
-              }
-            }
-          `,
-          variables: {
+      // 2️⃣ Create Auth user via Admin API
+      const createUserResponse = await fetch(
+        `${baseAuthUrl}/v1/admin/users`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${adminSecret}`
+          },
+          body: JSON.stringify({
             email: user.email,
-            passwordHash: user.password,
-            displayName: user.full_name
-          }
-        })
-      });
+            password: "Temp@1234", // Temporary password
+            emailVerified: true,
+            displayName: user.full_name,
+            defaultRole: "user"
+          })
+        }
+      );
 
-      const createUserResult = await createUserResponse.json();
+      const responseText = await createUserResponse.text();
 
-      if (createUserResult.errors || !createUserResult.data?.insert_auth_users_one?.id) {
+      let createdUser;
+
+      try {
+        createdUser = JSON.parse(responseText);
+      } catch (e) {
         skipped++;
         continue;
       }
 
-      const userId = createUserResult.data.insert_auth_users_one.id;
+      if (!createUserResponse.ok || !createdUser.id) {
+        skipped++;
+        continue;
+      }
 
-      // 3️⃣ Link user_id to master_employee
+      // 3️⃣ Link user_id in master_employee
       await fetch(graphqlUrl, {
         method: "POST",
         headers: {
@@ -99,7 +95,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           query: `
-            mutation LinkUser($id: Int!, $user_id: uuid!) {
+            mutation ($id: Int!, $user_id: uuid!) {
               update_master_employee_by_pk(
                 pk_columns: { id: $id },
                 _set: { user_id: $user_id }
@@ -110,7 +106,7 @@ export default async function handler(req, res) {
           `,
           variables: {
             id: user.id,
-            user_id: userId
+            user_id: createdUser.id
           }
         })
       });
