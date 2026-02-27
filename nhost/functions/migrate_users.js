@@ -1,30 +1,30 @@
 export default async function handler(req, res) {
-    try {
-        const adminSecret = process.env.NHOST_ADMIN_SECRET;
-        const graphqlUrl = process.env.NHOST_GRAPHQL_URL ||
-            "http://graphql-engine:8080/v1/graphql";
+  try {
+    const adminSecret = process.env.NHOST_ADMIN_SECRET;
+    const graphqlUrl = process.env.NHOST_GRAPHQL_URL ||
+  "http://graphql-engine:8080/v1/graphql";
 
-        if (!adminSecret || !graphqlUrl) {
-            return res.status(500).json({
-                error: "Missing environment variables"
-            });
-        }
+    if (!adminSecret || !graphqlUrl) {
+      return res.status(500).json({
+        error: "Missing environment variables"
+      });
+    }
 
-        // Extract project subdomain safely
-        const url = new URL(graphqlUrl);
-        const subdomain = url.hostname.split(".")[0];
+    // Extract project subdomain safely
+    const url = new URL(graphqlUrl);
+    const subdomain = url.hostname.split(".")[0];
 
-        const backendUrl = `https://${subdomain}.nhost.run`;
+    const backendUrl = `https://${subdomain}.nhost.run`;
 
-        // Fetch employees
-        const usersResponse = await fetch(graphqlUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-hasura-admin-secret": adminSecret
-            },
-            body: JSON.stringify({
-                query: `
+    // Fetch employees
+    const usersResponse = await fetch(graphqlUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-hasura-admin-secret": adminSecret
+      },
+      body: JSON.stringify({
+        query: `
           query {
             master_employee {
               id
@@ -34,61 +34,61 @@ export default async function handler(req, res) {
             }
           }
         `
-            })
-        });
+      })
+    });
 
-        const usersResult = await usersResponse.json();
+    const usersResult = await usersResponse.json();
 
-        if (usersResult.errors) {
-            return res.status(500).json(usersResult.errors);
+    if (usersResult.errors) {
+      return res.status(500).json(usersResult.errors);
+    }
+
+    const users = usersResult.data?.master_employee || [];
+
+    let migrated = 0;
+    let skipped = 0;
+
+    for (const user of users) {
+
+      if (!user.email || !user.password) {
+        skipped++;
+        continue;
+      }
+
+      const createUserResponse = await fetch(
+        `${backendUrl}/v1/auth/admin/users`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-hasura-admin-secret": adminSecret
+          },
+          body: JSON.stringify({
+            email: user.email,
+            passwordHash: user.password,
+            emailVerified: true,
+            displayName: user.full_name,
+            defaultRole: "user"
+          })
         }
+      );
 
-        const users = usersResult.data?.master_employee || [];
+      const createdUser = await createUserResponse.json();
 
-        let migrated = 0;
-        let skipped = 0;
+      if (!createUserResponse.ok || !createdUser.id) {
+        skipped++;
+        continue;
+      }
 
-        for (const user of users) {
-
-            if (!user.email || !user.password) {
-                skipped++;
-                continue;
-            }
-
-            const createUserResponse = await fetch(
-                `${backendUrl}/v1/auth/admin/users`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "x-hasura-admin-secret": adminSecret
-                    },
-                    body: JSON.stringify({
-                        email: user.email,
-                        passwordHash: user.password,
-                        emailVerified: true,
-                        displayName: user.full_name,
-                        defaultRole: "user"
-                    })
-                }
-            );
-
-            const createdUser = await createUserResponse.json();
-
-            if (!createUserResponse.ok || !createdUser.id) {
-                skipped++;
-                continue;
-            }
-
-            // Link user_id
-            await fetch(graphqlUrl, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-hasura-admin-secret": adminSecret
-                },
-                body: JSON.stringify({
-                    query: `
+      // Link user_id
+      await fetch(graphqlUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-hasura-admin-secret": adminSecret
+        },
+        body: JSON.stringify({
+          query: `
             mutation ($id: Int!, $user_id: uuid!) {
               update_master_employee_by_pk(
                 pk_columns: { id: $id },
@@ -98,25 +98,25 @@ export default async function handler(req, res) {
               }
             }
           `,
-                    variables: {
-                        id: user.id,
-                        user_id: createdUser.id
-                    }
-                })
-            });
+          variables: {
+            id: user.id,
+            user_id: createdUser.id
+          }
+        })
+      });
 
-            migrated++;
-        }
-
-        return res.json({
-            success: true,
-            migrated,
-            skipped
-        });
-
-    } catch (error) {
-        return res.status(500).json({
-            error: error.message
-        });
+      migrated++;
     }
+
+    return res.json({
+      success: true,
+      migrated,
+      skipped
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      error: error.message
+    });
+  }
 }
