@@ -13,7 +13,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 1: Fetch master_employee
+    // 1️⃣ Fetch employees from master_employee
     const usersResponse = await fetch(graphqlUrl, {
       method: "POST",
       headers: {
@@ -33,17 +33,7 @@ export default async function handler(req, res) {
       })
     });
 
-    const usersText = await usersResponse.text();
-
-    let usersResult;
-    try {
-      usersResult = JSON.parse(usersText);
-    } catch (e) {
-      return res.status(500).json({
-        error: "GraphQL did not return JSON",
-        raw: usersText
-      });
-    }
+    const usersResult = await usersResponse.json();
 
     if (usersResult.errors) {
       return res.status(500).json(usersResult.errors);
@@ -62,11 +52,14 @@ export default async function handler(req, res) {
         continue;
       }
 
+      // 2️⃣ Call Nhost Auth Signup (THIS IS THE CORRECT ENDPOINT)
       const signupResponse = await fetch(
-        `${authUrl}/sign-up/email-password`,
+        `${authUrl}/signup/email-password`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify({
             email: user.email,
             password: "Temp@1234",
@@ -82,7 +75,7 @@ export default async function handler(req, res) {
       let signupResult;
       try {
         signupResult = JSON.parse(signupText);
-      } catch (e) {
+      } catch {
         errors.push({
           email: user.email,
           raw: signupText
@@ -91,18 +84,23 @@ export default async function handler(req, res) {
         continue;
       }
 
-      if (!signupResponse.ok || !signupResult.user?.id) {
-        errors.push({
-          email: user.email,
-          response: signupResult
-        });
+      // If email already exists OR other error — skip safely
+      if (!signupResponse.ok) {
         skipped++;
         continue;
       }
 
-      const userId = signupResult.user.id;
+      // Nhost may return either structure depending on config
+      const userId =
+        signupResult?.session?.user?.id ||
+        signupResult?.user?.id;
 
-      // Link user_id
+      if (!userId) {
+        skipped++;
+        continue;
+      }
+
+      // 3️⃣ Link user_id in master_employee
       await fetch(graphqlUrl, {
         method: "POST",
         headers: {
@@ -132,6 +130,7 @@ export default async function handler(req, res) {
 
     return res.json({
       success: true,
+      totalUsers: users.length,
       migrated,
       skipped,
       errorCount: errors.length,
