@@ -53,7 +53,7 @@ export default async function handler(req, res) {
             }
 
             const createUserResponse = await fetch(
-                `${authUrl}/admin/users`,
+                `${authUrl}/users`,
                 {
                     method: "POST",
                     headers: {
