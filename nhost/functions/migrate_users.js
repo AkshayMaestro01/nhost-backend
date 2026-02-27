@@ -11,7 +11,7 @@ export default async function handler(req, res) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "x-hasura-admin-secret": adminSecret
+                "Authorization": `Bearer ${adminSecret}`
             },
             body: JSON.stringify({
                 query: `
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "x-hasura-admin-secret": adminSecret
+                        "Authorization": `Bearer ${adminSecret}`
                     },
                     body: JSON.stringify({
                         email: user.email,
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-hasura-admin-secret": adminSecret
+                    "Authorization": `Bearer ${adminSecret}`
                 },
                 body: JSON.stringify({
                     query: `
