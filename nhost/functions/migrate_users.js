@@ -77,7 +77,7 @@ export default async function handler(req, res) {
         }
       );
 
-      const signupText = await signupResponse.json();
+      const signupText = await signupResponse.text();
 
       let signupResult;
       try {
