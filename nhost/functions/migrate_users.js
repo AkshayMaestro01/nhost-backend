@@ -15,6 +15,7 @@ export default async function handler(req, res) {
         const subdomain = url.hostname.split(".")[0];
 
         const backendUrl = `https://${subdomain}.nhost.run`;
+        console.log("backendUrl", backendUrl)
 
         // Fetch employees
         const usersResponse = await fetch(graphqlUrl, {
@@ -56,7 +57,7 @@ export default async function handler(req, res) {
             }
 
             const createUserResponse = await fetch(
-                `${backendUrl}/v1/auth/admin/users`,
+                `https://scgzirnzbgwyoztigudo.auth.ap-south-1.nhost.run/v1/v1/auth/admin/users`,
                 {
                     method: "POST",
                     headers: {
