@@ -26,13 +26,15 @@ export default async function handler(req, res) {
             })
         })
 
+        console.log("usersResult", await usersResponse.json())
+
         const usersResult = await usersResponse.json()
 
         if (usersResult.errors) {
             return res.status(500).json(usersResult.errors)
         }
 
-        console.log("usersResult", usersResult)
+        
 
         const users = usersResult.data.master_employee
         let migratedCount = 0
