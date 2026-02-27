@@ -1,23 +1,19 @@
 export default async function handler(req, res) {
   try {
-    const graphqlUrl = process.env.NHOST_GRAPHQL_URL;
     const adminSecret = process.env.NHOST_ADMIN_SECRET;
+    const graphqlUrl = process.env.NHOST_GRAPHQL_URL;
 
-    if (!graphqlUrl || !adminSecret) {
+    if (!adminSecret || !graphqlUrl) {
       return res.status(500).json({
-        error: "Missing required environment variables"
+        error: "Missing environment variables"
       });
     }
 
-    // Convert GraphQL URL to backend base URL
-    // From:
-    // https://xyz.graphql.ap-south-1.nhost.run/v1
-    // To:
-    // https://xyz.nhost.run
-    const backendUrl = graphqlUrl.replace(
-      ".graphql.ap-south-1.nhost.run/v1",
-      ".nhost.run"
-    );
+    // Extract project subdomain safely
+    const url = new URL(graphqlUrl);
+    const subdomain = url.hostname.split(".")[0];
+
+    const backendUrl = `https://${subdomain}.nhost.run`;
 
     // Fetch employees
     const usersResponse = await fetch(graphqlUrl, {
@@ -48,18 +44,9 @@ export default async function handler(req, res) {
 
     const users = usersResult.data?.master_employee || [];
 
-    if (users.length === 0) {
-      return res.status(200).json({
-        success: true,
-        migrated: 0,
-        message: "No master_employee records found"
-      });
-    }
-
-    let migratedCount = 0;
+    let migrated = 0;
     let skipped = 0;
 
-    // Loop users
     for (const user of users) {
 
       if (!user.email || !user.password) {
@@ -67,7 +54,6 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // Create Auth user
       const createUserResponse = await fetch(
         `${backendUrl}/v1/auth/admin/users`,
         {
@@ -78,7 +64,7 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             email: user.email,
-            passwordHash: user.password, // existing bcrypt hash
+            passwordHash: user.password,
             emailVerified: true,
             displayName: user.full_name,
             defaultRole: "user"
@@ -88,18 +74,12 @@ export default async function handler(req, res) {
 
       const createdUser = await createUserResponse.json();
 
-      // If email already exists, fetch auth user manually
-      if (!createUserResponse.ok) {
+      if (!createUserResponse.ok || !createdUser.id) {
         skipped++;
         continue;
       }
 
-      if (!createdUser.id) {
-        skipped++;
-        continue;
-      }
-
-      // Link user_id to master_employee
+      // Link user_id
       await fetch(graphqlUrl, {
         method: "POST",
         headers: {
@@ -108,7 +88,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           query: `
-            mutation LinkUser($id: Int!, $user_id: uuid!) {
+            mutation ($id: Int!, $user_id: uuid!) {
               update_master_employee_by_pk(
                 pk_columns: { id: $id },
                 _set: { user_id: $user_id }
@@ -124,13 +104,13 @@ export default async function handler(req, res) {
         })
       });
 
-      migratedCount++;
+      migrated++;
     }
 
-    return res.status(200).json({
+    return res.json({
       success: true,
-      migrated: migratedCount,
-      skipped: skipped
+      migrated,
+      skipped
     });
 
   } catch (error) {
