@@ -56,7 +56,6 @@ export default async function handler(req, res) {
     const errors = [];
 
     for (const user of users) {
-        setInterval(() => {}, 1000);
 
       if (!user.email) {
         skipped++;
