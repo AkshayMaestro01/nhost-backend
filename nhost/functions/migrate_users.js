@@ -33,6 +33,8 @@ export default async function handler(req, res) {
             return res.status(500).json(usersResult.errors)
         }
 
+        console.log("usersResult", usersResult)
+
         const users = usersResult.data.master_employee
         let migratedCount = 0
 
