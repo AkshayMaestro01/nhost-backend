@@ -3,11 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "description": "DailyBriefing backend powered by Nhost Functions",
   "dependencies": {
-    "@nhost/nhost-js": "^4.5.0",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2"
   }
