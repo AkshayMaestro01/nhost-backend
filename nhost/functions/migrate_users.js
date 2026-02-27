@@ -48,10 +48,12 @@ export default async function handler(req, res) {
 
             // Create user using signup
             const signupResponse = await fetch(
-                `${authUrl}/signup`,
+                `${authUrl}/signup/email-password`,
                 {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
                     body: JSON.stringify({
                         email: user.email,
                         password: "Temp@1234",
@@ -75,12 +77,12 @@ export default async function handler(req, res) {
                 });
             }
 
-            if (!signupResponse.ok || !signupResult.user?.id) {
+            if (!signupResponse.ok || !signupResult.session?.user?.id) {
                 skipped++;
                 continue;
             }
 
-            const userId = signupResult.user.id;
+            const userId = signupResult.session.user.id;
 
             // Link user_id
             await fetch(graphqlUrl, {
