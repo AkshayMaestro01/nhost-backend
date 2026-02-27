@@ -6,12 +6,11 @@ export default async function handler(req, res) {
 
         const backendUrl = graphqlEndpoint.replace("/v1/graphql", "")
 
-        // 1️⃣ Fetch employees
         const usersResponse = await fetch(graphqlEndpoint, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${adminSecret}`
+                "x-hasura-admin-secret": adminSecret
             },
             body: JSON.stringify({
                 query: `
@@ -42,14 +41,13 @@ export default async function handler(req, res) {
 
             if (!user.email || !user.password) continue
 
-            // 2️⃣ Create Auth user
             const createUserResponse = await fetch(
                 `${backendUrl}/v1/auth/admin/users`,
                 {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${adminSecret}`
+                        "x-hasura-admin-secret": adminSecret
                     },
                     body: JSON.stringify({
                         email: user.email,
@@ -63,14 +61,15 @@ export default async function handler(req, res) {
 
             const createdUser = await createUserResponse.json()
 
+            console.log("Auth API response:", createdUser)
+
             if (!createdUser.id) continue
 
-            // 3️⃣ Link to master_employee.user_id
             await fetch(graphqlEndpoint, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${adminSecret}`
+                    "x-hasura-admin-secret": adminSecret
                 },
                 body: JSON.stringify({
                     query: `
