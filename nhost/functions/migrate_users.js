@@ -53,12 +53,12 @@ export default async function handler(req, res) {
             }
 
             const createUserResponse = await fetch(
-                `${authUrl}/users`,
+                `${authUrl}/auth/admin/users`,
                 {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${adminSecret}`
+                        "x-hasura-admin-secret": adminSecret
                     },
                     body: JSON.stringify({
                         email: user.email,
@@ -70,7 +70,6 @@ export default async function handler(req, res) {
                 }
             );
 
-            // Read as text first (safer)
             const responseText = await createUserResponse.text();
 
             let createdUser;
@@ -85,7 +84,6 @@ export default async function handler(req, res) {
             }
 
             if (!createUserResponse.ok || !createdUser.id) {
-                console.log("Auth error:", responseText)
                 skipped++;
                 continue;
             }
