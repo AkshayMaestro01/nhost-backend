@@ -63,7 +63,7 @@ export default async function handler(req, res) {
       }
 
       const signupResponse = await fetch(
-        `${authUrl}/signup/email-password`,
+        `${authUrl}/sign-up/email-password`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
