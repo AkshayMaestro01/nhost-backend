@@ -1,0 +1,15 @@
+{
+  "name": "dailybriefing-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "DailyBriefing backend powered by Nhost Cloud Functions",
+  "license": "ISC",
+  "private": true,
+  "dependencies": {
+    "@nhost/nhost-js": "^4.5.0",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6"
+  }
+}
