@@ -77,13 +77,14 @@ export default async function handler(req, res) {
         }
       );
 
-      const signupText = await signupResponse;
+      const signupText = await signupResponse.json();
 
       let signupResult;
       try {
         console.log("Signup response:", signupText);
         signupResult = JSON.parse(signupText);
       } catch (e) {
+        console.log("Signup JSON parse error:", e);
         errors.push({
           email: user.email,
           raw: signupText
