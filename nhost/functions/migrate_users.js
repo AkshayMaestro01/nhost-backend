@@ -27,6 +27,8 @@ export default async function handler(req, res) {
     const usersResult = await usersResponse.json();
     const users = usersResult.data?.master_employee || [];
 
+    console.log(users);
+
     let migrated = 0;
     let skipped = 0;
     const errors = [];
