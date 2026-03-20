@@ -1,24 +1,20 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
-
-serve(async (req) => {
+exports.handler = async (req, res) => {
   try {
-    const { newPassword } = await req.json();
+    const { newPassword } = req.body;
 
-    const authHeader = req.headers.get("authorization");
-    const backendUrl = Deno.env.get("NHOST_BACKEND_URL");
-    const adminSecret = Deno.env.get("NHOST_ADMIN_SECRET") ?? "";
+    const authHeader = req.headers["authorization"];
+    const backendUrl = process.env.NHOST_BACKEND_URL;
+    const adminSecret = process.env.NHOST_ADMIN_SECRET;
 
-    console.log("=== DEBUG START ===");
     console.log("authHeader present:", !!authHeader);
     console.log("backendUrl:", backendUrl);
     console.log("adminSecret present:", !!adminSecret);
 
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Step 1: validate token and get user
+    // Step 1: Get user from token
     const meRes = await fetch(`${backendUrl}/v1/auth/user`, {
       headers: { Authorization: authHeader },
     });
@@ -28,18 +24,19 @@ serve(async (req) => {
     console.log("meRes body:", meText);
 
     if (!meRes.ok) {
-      return new Response(JSON.stringify({ error: "Invalid token", detail: meText }), { status: 401 });
+      return res.status(401).json({ error: "Invalid token", detail: meText });
     }
 
     const meData = JSON.parse(meText);
     const userId = meData.id;
     console.log("userId:", userId);
 
-    // Step 2: hash password
-    const hashed = await bcrypt.hash(newPassword);
+    // Step 2: Hash password using bcryptjs (Node compatible)
+    const bcrypt = require("bcryptjs");
+    const hashed = await bcrypt.hash(newPassword, 10);
     console.log("hashed password generated:", !!hashed);
 
-    // Step 3: GraphQL update
+    // Step 3: Update via GraphQL
     const gqlRes = await fetch(`${backendUrl}/v1/graphql`, {
       method: "POST",
       headers: {
@@ -68,13 +65,13 @@ serve(async (req) => {
     const gqlData = JSON.parse(gqlText);
 
     if (gqlData.errors) {
-      return new Response(JSON.stringify({ error: "GraphQL failed", detail: gqlData.errors }), { status: 500 });
+      return res.status(500).json({ error: "GraphQL failed", detail: gqlData.errors });
     }
 
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
+    return res.status(200).json({ success: true });
 
   } catch (err) {
     console.error("FUNCTION ERROR:", err);
-    return new Response(JSON.stringify({ error: "Server error", detail: String(err) }), { status: 500 });
+    return res.status(500).json({ error: "Server error", detail: String(err) });
   }
-});
+};
