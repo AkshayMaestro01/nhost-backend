@@ -10,8 +10,7 @@ serve(async (req) => {
   try {
     const { newPassword } = await req.json();
 
-    const backendUrl = Deno.env.get("NHOST_BACKEND_URL");
-    const adminSecret = Deno.env.get("NHOST_ADMIN_SECRET");
+    const adminSecret = process.env.NHOST_ADMIN_SECRET;
 
     if (!backendUrl || !adminSecret) {
       return new Response(
@@ -45,16 +44,15 @@ serve(async (req) => {
       );
     }
 
-    // ✅ Update password using admin API
-    const updateRes = await fetch(`${backendUrl}/v1/auth/user`, {
-      method: "PATCH",
+    const updateRes = await fetch(`https://scgzirnzbgwyoztigudo.auth.ap-south-1.nhost.run/v1/user/password`, {
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-hasura-admin-secret": adminSecret,
       },
       body: JSON.stringify({
-        id: userId,
-        password: newPassword,
+        userId,
+        newPassword,
       }),
     });
 
