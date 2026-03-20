@@ -1,26 +1,15 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-function parseJwt(token) {
-  const base64Payload = token.split('.')[1];
-  const decodedPayload = atob(base64Payload);
-  return JSON.parse(decodedPayload);
-}
-
 serve(async (req) => {
   try {
     const { newPassword } = await req.json();
 
-    const adminSecret = process.env.NHOST_ADMIN_SECRET;
+    const backendUrl = Deno.env.get("NHOST_BACKEND_URL");
 
-    if (!backendUrl || !adminSecret) {
-      return new Response(
-        JSON.stringify({ error: "Missing environment variables" }),
-        { status: 500 }
-      );
-    }
-
-    // ✅ Get token from request
     const authHeader = req.headers.get("authorization");
+
+    console.log("authHeader", authHeader);
+    console.log("backendUrl", backendUrl);
 
     if (!authHeader) {
       return new Response(
@@ -29,38 +18,25 @@ serve(async (req) => {
       );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-
-    // ✅ Decode JWT to get user ID
-    const decoded = parseJwt(token);
-
-    const userId =
-      decoded["https://hasura.io/jwt/claims"]["x-hasura-user-id"];
-
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: "Invalid token" }),
-        { status: 401 }
-      );
-    }
-
-    const updateRes = await fetch(`https://scgzirnzbgwyoztigudo.auth.ap-south-1.nhost.run/v1/user/password`, {
+    // ✅ Call Nhost Auth directly with user token
+    const updateRes = await fetch(`${backendUrl}/v1/auth/user/password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-hasura-admin-secret": adminSecret,
+        Authorization: authHeader, // ✅ VERY IMPORTANT
       },
       body: JSON.stringify({
-        userId,
-        newPassword,
+        newPassword: newPassword,
       }),
     });
 
-    if (!updateRes.ok) {
-      const errorText = await updateRes.text();
+    const text = await updateRes.text();
 
+    console.log("text", text);
+
+    if (!updateRes.ok) {
       return new Response(
-        JSON.stringify({ error: errorText }),
+        JSON.stringify({ error: text }),
         { status: 500 }
       );
     }
