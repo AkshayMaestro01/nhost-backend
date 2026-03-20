@@ -1,4 +1,6 @@
-exports.handler = async (req, res) => {
+const bcrypt = require("bcryptjs");
+
+module.exports = async (req, res) => {
   try {
     const { newPassword } = req.body;
 
@@ -31,8 +33,7 @@ exports.handler = async (req, res) => {
     const userId = meData.id;
     console.log("userId:", userId);
 
-    // Step 2: Hash password using bcryptjs (Node compatible)
-    const bcrypt = require("bcryptjs");
+    // Step 2: Hash password
     const hashed = await bcrypt.hash(newPassword, 10);
     console.log("hashed password generated:", !!hashed);
 
