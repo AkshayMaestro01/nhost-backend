@@ -5,7 +5,8 @@ module.exports = async (req, res) => {
     const { newPassword } = req.body;
 
     const authHeader = req.headers["authorization"];
-    const backendUrl = "https://scgzirnzbgwyoztigudo.hasura.ap-south-1.nhost.run";
+    const authUrl = "https://scgzirnzbgwyoztigudo.auth.ap-south-1.nhost.run/v1";
+    const hasuraUrl = "https://scgzirnzbgwyoztigudo.hasura.ap-south-1.nhost.run/v1";
     const adminSecret = process.env.NHOST_ADMIN_SECRET;
 
     console.log("authHeader present:", !!authHeader);
@@ -17,7 +18,7 @@ module.exports = async (req, res) => {
     }
 
     // Step 1: Get user from token
-    const meRes = await fetch(`${backendUrl}/v1/auth/user`, {
+    const meRes = await fetch(`${authUrl}/user`, {
       headers: { Authorization: authHeader },
     });
 
@@ -38,7 +39,7 @@ module.exports = async (req, res) => {
     console.log("hashed password generated:", !!hashed);
 
     // Step 3: Update via GraphQL
-    const gqlRes = await fetch(`${backendUrl}/v1/graphql`, {
+    const gqlRes = await fetch(`${hasuraUrl}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
