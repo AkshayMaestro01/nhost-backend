@@ -6,7 +6,7 @@ serve(async (req) => {
 
     // 🔐 Step 1: Verify current password
     const loginRes = await fetch(
-      `${Deno.env.get('NHOST_BACKEND_URL')}/v1/auth/token`,
+      `${process.env.NHOST_AUTH_URL}/token`,
       {
         method: 'POST',
         headers: {
@@ -32,7 +32,7 @@ serve(async (req) => {
 
     // 🔐 Step 2: Update password using admin secret
     const updateRes = await fetch(
-      `${Deno.env.get('NHOST_BACKEND_URL')}/v1/auth/user`,
+      `${process.env.NHOST_AUTH_URL}/user`,
       {
         method: 'PATCH',
         headers: {
