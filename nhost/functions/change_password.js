@@ -6,7 +6,7 @@ module.exports = async (req, res) => {
 
     const authHeader = req.headers["authorization"];
     const authUrl = "https://scgzirnzbgwyoztigudo.auth.ap-south-1.nhost.run/v1";
-    const hasuraUrl = "https://scgzirnzbgwyoztigudo.hasura.ap-south-1.nhost.run/v1";
+    const graphqlUrl = "https://scgzirnzbgwyoztigudo.graphql.ap-south-1.nhost.run/v1";
     const adminSecret = process.env.NHOST_ADMIN_SECRET;
 
     console.log("authHeader present:", !!authHeader);
@@ -38,7 +38,7 @@ module.exports = async (req, res) => {
     console.log("hashed password generated:", !!hashed);
 
     // Step 3: Update via GraphQL
-    const gqlRes = await fetch(`${hasuraUrl}`, {
+    const gqlRes = await fetch(graphqlUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
