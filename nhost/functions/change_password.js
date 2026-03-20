@@ -2,53 +2,59 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 serve(async (req) => {
   try {
-    const { email, currentPassword, newPassword } = await req.json();
+    const { newPassword } = await req.json();
 
-    // 🔐 Step 1: Verify current password
-    const loginRes = await fetch(
-      `${process.env.NHOST_AUTH_URL}/token`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password: currentPassword,
-        }),
-      }
-    );
+    const backendUrl = Deno.env.get("NHOST_BACKEND_URL");
+    const adminSecret = Deno.env.get("NHOST_ADMIN_SECRET");
 
-    const loginData = await loginRes.json();
-
-    if (!loginRes.ok) {
+    if (!backendUrl || !adminSecret) {
       return new Response(
-        JSON.stringify({ error: 'Current password is incorrect' }),
+        JSON.stringify({ error: "Missing env variables" }),
+        { status: 500 }
+      );
+    }
+
+    // ✅ Get token from request
+    const authHeader = req.headers.get("authorization");
+
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
         { status: 401 }
       );
     }
 
-    const userId = loginData.user.id;
+    const token = authHeader.replace("Bearer ", "");
 
-    // 🔐 Step 2: Update password using admin secret
-    const updateRes = await fetch(
-      `${process.env.NHOST_AUTH_URL}/user`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-hasura-admin-secret': process.env.NHOST_ADMIN_SECRET,
-        },
-        body: JSON.stringify({
-          id: userId,
-          password: newPassword,
-        }),
-      }
-    );
+    // ✅ Get user from token
+    const userRes = await fetch(`${backendUrl}/v1/auth/user`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const userData = await userRes.json();
+
+    const userId = userData.id; // ✅ THIS IS UUID
+
+    // ✅ Update password
+    const updateRes = await fetch(`${backendUrl}/v1/auth/user`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-hasura-admin-secret": adminSecret,
+      },
+      body: JSON.stringify({
+        id: userId,
+        password: newPassword,
+      }),
+    });
 
     if (!updateRes.ok) {
+      const text = await updateRes.text();
       return new Response(
-        JSON.stringify({ error: 'Failed to update password' }),
+        JSON.stringify({ error: text }),
         { status: 500 }
       );
     }
@@ -60,7 +66,7 @@ serve(async (req) => {
 
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: 'Server error' }),
+      JSON.stringify({ error: "Server error" }),
       { status: 500 }
     );
   }
