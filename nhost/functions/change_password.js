@@ -5,7 +5,7 @@ module.exports = async (req, res) => {
     const { newPassword } = req.body;
 
     const authHeader = req.headers["authorization"];
-    const backendUrl = process.env.NHOST_BACKEND_URL;
+    const backendUrl = "https://scgzirnzbgwyoztigudo.hasura.ap-south-1.nhost.run";
     const adminSecret = process.env.NHOST_ADMIN_SECRET;
 
     console.log("authHeader present:", !!authHeader);
