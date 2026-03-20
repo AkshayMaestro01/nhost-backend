@@ -1,4 +1,10 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+
+function parseJwt(token) {
+  const base64Payload = token.split('.')[1];
+  const decodedPayload = atob(base64Payload);
+  return JSON.parse(decodedPayload);
+}
 
 serve(async (req) => {
   try {
@@ -9,7 +15,7 @@ serve(async (req) => {
 
     if (!backendUrl || !adminSecret) {
       return new Response(
-        JSON.stringify({ error: "Missing env variables" }),
+        JSON.stringify({ error: "Missing environment variables" }),
         { status: 500 }
       );
     }
@@ -26,19 +32,20 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    // ✅ Get user from token
-    const userRes = await fetch(`${backendUrl}/v1/auth/user`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    // ✅ Decode JWT to get user ID
+    const decoded = parseJwt(token);
 
-    const userData = await userRes.json();
+    const userId =
+      decoded["https://hasura.io/jwt/claims"]["x-hasura-user-id"];
 
-    const userId = userData.id; // ✅ THIS IS UUID
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401 }
+      );
+    }
 
-    // ✅ Update password
+    // ✅ Update password using admin API
     const updateRes = await fetch(`${backendUrl}/v1/auth/user`, {
       method: "PATCH",
       headers: {
@@ -52,9 +59,10 @@ serve(async (req) => {
     });
 
     if (!updateRes.ok) {
-      const text = await updateRes.text();
+      const errorText = await updateRes.text();
+
       return new Response(
-        JSON.stringify({ error: text }),
+        JSON.stringify({ error: errorText }),
         { status: 500 }
       );
     }
@@ -65,6 +73,8 @@ serve(async (req) => {
     );
 
   } catch (err) {
+    console.error("FUNCTION ERROR:", err);
+
     return new Response(
       JSON.stringify({ error: "Server error" }),
       { status: 500 }
