@@ -10,7 +10,6 @@ module.exports = async (req, res) => {
     const adminSecret = process.env.NHOST_ADMIN_SECRET;
 
     console.log("authHeader present:", !!authHeader);
-    console.log("backendUrl:", backendUrl);
     console.log("adminSecret present:", !!adminSecret);
 
     if (!authHeader) {
