@@ -1,4 +1,5 @@
 export default async function handler(req, res) {
+  console.log("Sync Auth User")
   try {
     const authUrl = process.env.NHOST_AUTH_URL;
 
